@@ -70,7 +70,7 @@ internal static class Dialogs
         var body = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14 };
         if (glyph.Length > 0)
             body.Children.Add(new TextBlock { Text = glyph, FontSize = 28, VerticalAlignment = VerticalAlignment.Top });
-        body.Children.Add(new TextBlock { Text = req.Text, TextWrapping = TextWrapping.Wrap, MaxWidth = 440 });
+        body.Children.Add(new TextBlock { Text = req.Text, TextWrapping = TextWrapping.Wrap, MaxWidth = 540 });
 
         win.Content = new StackPanel { Margin = new Thickness(20), Spacing = 18, Children = { body, row } };
         win.Closed += (_, _) => tcs.TrySetResult(closed);

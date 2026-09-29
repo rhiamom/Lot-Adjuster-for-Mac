@@ -31,7 +31,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Shapes;
+using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -46,6 +46,7 @@ namespace LotAdjuster.App.Views;
 public sealed class MainWindow : Window
 {
     private const double CheckBoxHeight = 32;
+    private static readonly IBrush Maroon = new SolidColorBrush(Color.FromRgb(0x80, 0x00, 0x00));
     private static readonly IBrush FormBack = new SolidColorBrush(Color.FromRgb(0xF0, 0xF0, 0xF0));
 
     private readonly WF.PrimaryForm _form;
@@ -333,6 +334,8 @@ public sealed class MainWindow : Window
         // "X") are really labels; draw them as text so Mac fonts don't clip.
         if (t.BorderNone && !t.Multiline)
             return MakeLabel(t, size, bold);
+        if (t.BorderNone && t.ReadOnly)
+            return MakeReadOnlyText(t, size, bold);
 
         var ui = new TextBox
         {
@@ -356,6 +359,48 @@ public sealed class MainWindow : Window
         });
         return ui;
     }
+
+    // Her borderless multiline read-only boxes (Explanation, LongExpl,
+    // AdvancedExpl, SizeError). On a successful final screen the step that
+    // says to load the lot and build something is shown in bold dark red:
+    // until that is done the game shows the house as missing and new road
+    // as grass (found in testing, 2026-09-29). Her text is unchanged.
+    private Avalonia.Controls.Control MakeReadOnlyText(WF.TextBox t, double size, bool bold)
+    {
+        var ui = new SelectableTextBlock
+        {
+            Width = t.Size.Width, MaxHeight = t.Size.Height, FontSize = size,
+            FontWeight = bold ? FontWeight.Bold : FontWeight.Normal, TextWrapping = TextWrapping.Wrap,
+        };
+        string? shown = null;
+        bool emphasised = false;
+        _refreshers.Add(() =>
+        {
+            ui.Foreground = Brush(t.ForeColor);
+            string text = (t.Text ?? "").Replace("\r\n", "\n");
+            bool emphasise = ReferenceEquals(t, _form.Explanation) && FinishedOk;
+            if (text == shown && emphasise == emphasised) return;
+            shown = text;
+            emphasised = emphasise;
+            ui.Inlines = new InlineCollection();
+            string[] paragraphs = text.Split("\n\n");
+            for (int i = 0; i < paragraphs.Length; i++)
+            {
+                var run = new Run(paragraphs[i] + (i < paragraphs.Length - 1 ? "\n\n" : ""));
+                if (emphasise && paragraphs[i].TrimStart().StartsWith("2)"))
+                {
+                    run.FontWeight = FontWeight.Bold;
+                    run.Foreground = Maroon;
+                }
+                ui.Inlines.Add(run);
+            }
+        });
+        return ui;
+    }
+
+    // Her final screen after a save (not an abort: she turns the title red).
+    private bool FinishedOk =>
+        _form.CurrentScreen == WF.PrimaryForm.ScreenFinal && _form.Title.ForeColor != System.Drawing.Color.Red;
 
     private Avalonia.Controls.Control MakeLabel(WF.Control c, double size, bool bold)
     {
@@ -415,6 +460,7 @@ public sealed class MainWindow : Window
     {
         if (_busy || _refreshing) return;
         _busy = true;
+        bool wasFinal = _form.CurrentScreen == WF.PrimaryForm.ScreenFinal;
         _root.IsHitTestVisible = false;
         Cursor = new Avalonia.Input.Cursor(StandardCursorType.Wait);
         try { await Task.Run(action); }
@@ -426,7 +472,20 @@ public sealed class MainWindow : Window
             Cursor = Avalonia.Input.Cursor.Default;
             Refresh();
         }
-        if (_form.IsClosed) Close();
+        if (_form.IsClosed) { Close(); return; }
+        if (!wasFinal && FinishedOk)
+            await Dialogs.Ask(this, new WF.MessageRequest
+            {
+                Caption = "Important: finish the lot in the game",
+                Text = "Before you play or share this lot, load it in the game and build something " +
+                       "(even one wall that you delete again), then save.\n\n" +
+                       "That rebuilds the parts of the lot the game draws for itself:\n" +
+                       "  \u2022 the house in the neighborhood view (until then the lot may look empty)\n" +
+                       "  \u2022 the road and sidewalk on any widened part (until then it shows as grass)\n\n" +
+                       "Then follow the rest of the steps in the LotAdjuster window.",
+                Buttons = WF.MessageBoxButtons.OK,
+                Icon = WF.MessageBoxIcon.Warning,
+            });
     }
 
     private Task ShowError(Exception ex)
