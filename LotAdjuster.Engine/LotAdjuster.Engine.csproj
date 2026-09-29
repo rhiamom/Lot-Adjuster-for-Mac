@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <AssemblyName>LotAdjuster.Engine</AssemblyName>
+    <RootNamespace>LotExpander</RootNamespace>
+    <!-- Mootilda's / Andi8104's sources predate nullable reference types and
+         implicit usings; compile them as written. -->
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- Mootilda built LotAdjuster with ADJUST defined (Debug and Release); her
+         R_* handlers are shared with her other lot tools and branch on it. -->
+    <DefineConstants>$(DefineConstants);ADJUST</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Filetypes\Filetypes.csproj" />
+  </ItemGroup>
+</Project>
