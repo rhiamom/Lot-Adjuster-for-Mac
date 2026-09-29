@@ -115,6 +115,8 @@ namespace SimPe.Packages
         // Package that owns this entry, so a renumbered Instance can keep
         // its CLST (compression directory) membership in step.
         internal GeneratableFile? Owner;
+        // Which load of the owner this entry came from (see EnsureOpen).
+        internal int Generation;
 
         // Explicit impl so the public `Instance` field is still usable
         // internally while satisfying IPackedFileDescriptor.Instance.
@@ -169,6 +171,25 @@ namespace SimPe.Packages
         // Path this package was loaded from (when opened via File.LoadFromFile).
         // Hood Checker uses it to find sibling subhood *.package files.
         public string FileName { get; internal set; } = string.Empty;
+
+        // Real SimPE's Close() only closes the file stream; the next read
+        // reopens the file. LotAdjuster relies on that: after saving, her
+        // Restart button reads the same (closed) package again. So a closed
+        // package reloads itself from FileName on its next use.
+        private bool _closed;
+        private int _generation;
+
+        private void EnsureOpen()
+        {
+            if (!_closed || string.IsNullOrEmpty(FileName)) return;
+            _entries.Clear();
+            _clstSet.Clear();
+            _generation++;
+            using var fs = new FileStream(FileName, FileMode.Open, FileAccess.Read);
+            using var br = new BinaryReader(fs);
+            Load(br);
+            _closed = false;
+        }
 
         internal GeneratableFile() { }
 
@@ -238,6 +259,7 @@ namespace SimPe.Packages
                 e.OriginalOffset = e.Offset;
                 e.OriginalSize   = e.Size;
                 e.Owner = this;
+                e.Generation = _generation;
                 _entries.Add(e);
             }
 
@@ -267,6 +289,7 @@ namespace SimPe.Packages
         // -----------------------------------------------------------------
         public IPackedFileDescriptor? FindFile(uint type, uint subtype, uint group, uint instance)
         {
+            EnsureOpen();
             foreach (var e in _entries)
                 if (e.Type == type && e.SubType == subtype &&
                     e.Group == group && e.Instance == instance)
@@ -276,6 +299,7 @@ namespace SimPe.Packages
 
         public IPackedFileDescriptor[] FindFiles(uint type)
         {
+            EnsureOpen();
             var hits = new List<IPackedFileDescriptor>();
             foreach (var e in _entries)
                 if (e.Type == type)
@@ -285,7 +309,7 @@ namespace SimPe.Packages
 
         // SimPE's Index: every resource descriptor, in index order. Returned
         // as a snapshot, so LotAdjuster can Remove() while iterating it.
-        public IPackedFileDescriptor[] Index => _entries.ToArray();
+        public IPackedFileDescriptor[] Index { get { EnsureOpen(); return _entries.ToArray(); } }
 
         // An untouched record is stored compressed and listed in the CLST by
         // (Type, Group, Instance, SubType). When its Instance changes, move the
@@ -305,7 +329,15 @@ namespace SimPe.Packages
 
         public IPackedFile Read(IPackedFileDescriptor pfd)
         {
+            EnsureOpen();
             var e = (PackedFileDescriptor)pfd;
+            if (e.Generation != _generation)
+            {
+                // An entry from before a reload: use the same resource's
+                // current entry, since offsets change when a file is saved.
+                e = (PackedFileDescriptor?)FindFile(e.Type, e.SubType, e.Group, e.Instance)
+                    ?? throw new InvalidOperationException("Resource no longer in package");
+            }
             if (e.UserData != null) return new PackedFile(e.UserData);
 
             byte[] body = new byte[e.OriginalSize];
@@ -419,7 +451,7 @@ namespace SimPe.Packages
             for (int i = 0; i < 7; i++) bw.Write(_reserved02[i]);
         }
 
-        public void Close() { _source = Array.Empty<byte>(); }
+        public void Close() { _source = Array.Empty<byte>(); _closed = true; }
         // SimPE's Close(bool total); LotAdjuster calls Close(true) before
         // dropping a package. Nothing extra to release here.
         public void Close(bool total) => Close();

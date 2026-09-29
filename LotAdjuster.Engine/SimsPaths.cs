@@ -1,4 +1,4 @@
-/***************************************************************************
+﻿/***************************************************************************
  *   Hood Checker for Mac                                                  *
  *   macOS port © 2026 GramzeSweatshop (rhiamom@mac.com)                   *
  *   GPL v2 or later. See Licences/GPL-LICENSE.txt                         *
@@ -32,6 +32,12 @@ namespace LotExpander
         {
             get
             {
+                // Testing only: point the tools at a scratch copy of a user
+                // folder so nothing touches the real game data.
+                string? over = Environment.GetEnvironmentVariable("LOTADJUSTER_SIMS_FOLDER");
+                if (!string.IsNullOrEmpty(over))
+                    return Directory.Exists(over) ? over : null;
+
                 foreach (string c in Candidates)
                 {
                     string full = Path.Combine(Home, c);

@@ -1,4 +1,4 @@
-/***************************************************************************
+﻿/***************************************************************************
  *   macOS port © 2026 GramzeSweatshop                                     *
  *   GNU GPLv2 or later, see LICENSE.                                      *
  ***************************************************************************/
@@ -119,7 +119,22 @@ namespace LotExpander
             if (visible != null) c.Visible = bool.Parse(visible);
             string enabled = _designerResources.GetString(name + ".Enabled", CultureInfo.InvariantCulture);
             if (enabled != null) c.Enabled = bool.Parse(enabled);
+            // Layout values, for LotExpander_Shown's width sums and for hosts.
+            string location = _designerResources.GetString(name + ".Location", CultureInfo.InvariantCulture);
+            if (location != null) { var v = Pair(location); c.Location = new System.Drawing.Point(v.Item1, v.Item2); }
+            string size = _designerResources.GetString(name + ".Size", CultureInfo.InvariantCulture);
+            if (size != null) { var v = Pair(size); c.Size = new System.Drawing.Size(v.Item1, v.Item2); }
+            c.Font = _designerResources.GetString(name + ".Font", CultureInfo.InvariantCulture);
+            c.TextAlign = _designerResources.GetString(name + ".TextAlign", CultureInfo.InvariantCulture);
+            c.Multiline = _designerResources.GetString(name + ".Multiline", CultureInfo.InvariantCulture) == "True";
+            c.AutoSize = _designerResources.GetString(name + ".AutoSize", CultureInfo.InvariantCulture) == "True";
             return c;
+        }
+
+        private static (int, int) Pair(string s)
+        {
+            string[] p = s.Split(',');
+            return (int.Parse(p[0].Trim(), CultureInfo.InvariantCulture), int.Parse(p[1].Trim(), CultureInfo.InvariantCulture));
         }
 
         private void InitializeComponent()
@@ -225,6 +240,31 @@ namespace LotExpander
             AdvancedExpl.ReadOnly = true;
             LongExpl.ReadOnly = true;
             SunLocation.ReadOnly = true;
+
+            // Appearance her Designer set in code (for hosts that draw the form).
+            SizeError.BorderNone = Explanation.BorderNone = MoveReset.BorderNone = true;
+            AdvancedExpl.BorderNone = LongExpl.BorderNone = SunLocation.BorderNone = true;
+            PictureLogo.ImageName = "LotAdjuster";
+            PictureBack.ImageName = "MoveBack";     PictureBack.BorderSingle = true;
+            PictureLeft.ImageName = "MoveLeft";     PictureLeft.BorderSingle = true;
+            PictureRight.ImageName = "MoveRight";   PictureRight.BorderSingle = true;
+            PictureForward.ImageName = "MoveFront"; PictureForward.BorderSingle = true;
+            string clientSize = _designerResources.GetString("$this.ClientSize", CultureInfo.InvariantCulture);
+            if (clientSize != null) { var v = Pair(clientSize); Size = new System.Drawing.Size(v.Item1, v.Item2); }
+
+            // Containment, in her Designer's Controls.Add order.
+            ClassValuePanel.Add(ClassOverride, ClassValueDisplay, ClassValueChange);
+            LotProperties.Add(LabelRoad, LabelLeft, LeftYard, LeftRoad, LabelRight, RightYard, RightRoad,
+                LabelFront, FrontYard, FrontRoad, LabelBack, BackYard, BackRoad, LabelWidth, LabelMax, WidthMax,
+                LabelX0, HeightMax, LabelOld, WidthOld, LabelX1, HeightOld, LabelNew, WidthNew, LabelX2, HeightNew,
+                SizeError, LabelSize, Progress);
+            AdvancedFeatures.Add(KeepStreet, MoveLot, LabelMoveLeft, MoveLeft, LabelMoveBack, MoveBack, PictureBack,
+                PictureLeft, MoveResetLabel, MoveReset, PictureRight, PictureForward, ChangeRoads, AllowShrink,
+                RemoveFurniture, Hidden, BeachLot, RemoveTerrainPaints, MatchHoodTerrain, LeavePortals, PaveRoads,
+                BumpyRoads, KeepElevation, UpdateHoodTerrain, LabelEdges, LotEdges, ClassValuePanel, MultiBackup,
+                AdvancedExpl);
+            Add(PictureLogo, SunLocation, Title, LotProperties, AdvancedFeatures, Explanation, LongExpl, Liste,
+                BackButton, AdvancedButton, NextButton, Defaults);
 
             // Event wiring, in her Designer's order.
             Liste.DoubleClick += new EventHandler(Liste_DoubleClick);

@@ -1,0 +1,15 @@
+<!--
+  LotAdjuster for Mac
+  LotAdjuster © 2008-2013 Mootilda (http://Mootilda.ModTheSims.info)
+  macOS port © 2026 GramzeSweatshop (rhiamom@mac.com)
+  Ported with Claude (Anthropic)
+  GPL v2 or later. See Licences/GPL-LICENSE.txt
+-->
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="LotAdjuster.App.App"
+             RequestedThemeVariant="Light">
+  <Application.Styles>
+    <FluentTheme />
+  </Application.Styles>
+</Application>

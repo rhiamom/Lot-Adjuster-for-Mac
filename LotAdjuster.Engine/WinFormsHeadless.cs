@@ -1,4 +1,4 @@
-/***************************************************************************
+﻿/***************************************************************************
  *   macOS port © 2026 GramzeSweatshop                                     *
  *   GNU GPLv2 or later, see LICENSE.                                      *
  ***************************************************************************/
@@ -72,6 +72,24 @@ namespace LotExpander
         public Point Location { get; set; }
         public Size Size { get; set; }
         public Cursor Cursor { get; set; } = Cursors.Default;
+
+        // Layout, from her Designer and resx. Her code never reads these
+        // (except Location/Size in LotExpander_Shown); a host draws with them.
+        public Control Parent { get; private set; }
+        public List<Control> Controls { get; } = new List<Control>();
+        public string Font { get; set; }            // e.g. "Microsoft Sans Serif, 11pt, style=Bold"
+        public string TextAlign { get; set; }       // e.g. "TopRight"
+        public bool Multiline { get; set; }
+        public bool AutoSize { get; set; }
+        public bool BorderNone { get; set; }        // BorderStyle.None
+        public bool BorderSingle { get; set; }      // BorderStyle.FixedSingle
+        public string ImageName { get; set; }       // Properties.Resources image
+
+        // WinForms Controls.Add: the first control added is drawn on top.
+        public void Add(params Control[] children)
+        {
+            foreach (var c in children) { c.Parent = this; Controls.Add(c); }
+        }
 
         public event EventHandler Enter;
         public event EventHandler Leave;
