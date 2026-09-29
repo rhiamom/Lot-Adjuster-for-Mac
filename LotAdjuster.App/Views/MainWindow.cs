@@ -310,9 +310,9 @@ public sealed class MainWindow : Window
     private Avalonia.Controls.Control MakePicture(WF.PictureBox p)
     {
         var image = new Image { Width = p.Size.Width, Height = p.Size.Height, Stretch = Stretch.None };
-        string file = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", p.ImageName + ".bmp");
-        if (p.ImageName != null && File.Exists(file))
-            image.Source = new Bitmap(file);
+        using (Stream? bmp = p.ImageName == null ? null
+                   : typeof(MainWindow).Assembly.GetManifestResourceStream("Assets." + p.ImageName + ".bmp"))
+            if (bmp != null) image.Source = new Bitmap(bmp);
         Avalonia.Controls.Control ui = image;
         if (p.BorderSingle)
             ui = new Border { Child = image, BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Width = p.Size.Width, Height = p.Size.Height };

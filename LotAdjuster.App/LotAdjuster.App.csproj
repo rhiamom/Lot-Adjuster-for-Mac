@@ -17,7 +17,9 @@
 
   <ItemGroup>
     <!-- Mootilda's images from her Properties folder, unchanged. -->
-    <Content Include="Assets\*.bmp" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Embedded, not copied: loose files beside the executable would break
+         code signing of the .app. -->
+    <EmbeddedResource Include="Assets\*.bmp" LogicalName="Assets.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
