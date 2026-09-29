@@ -111,5 +111,9 @@ namespace SimPe
             foreach (byte b in data) sb.Append((char)b);
             return sb.ToString();
         }
+
+        // SimPE's Helper.ToString(object): null -> "", else o.ToString().
+        // LotAdjuster shows the lot class value (a uint) through it.
+        public static string ToString(object o) => o == null ? string.Empty : o.ToString();
     }
 }

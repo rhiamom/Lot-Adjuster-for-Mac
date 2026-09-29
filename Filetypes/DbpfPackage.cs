@@ -46,8 +46,13 @@ namespace SimPe.Interfaces.Files
         void SetUserData(byte[] data, bool compressed);
 
         // Hood Checker reads the resource Instance off descriptors returned by
-        // FindFiles (e.g. to resolve a name STR# by instance).
-        uint Instance { get; }
+        // FindFiles (e.g. to resolve a name STR# by instance). LotAdjuster's
+        // FixTerrainPaints also renumbers LOTG records by assigning it.
+        uint Instance { get; set; }
+
+        // LotAdjuster's FinalScreen switches on the resource type while
+        // walking GeneratableFile.Index.
+        uint Type { get; }
     }
 
     public interface IPackedFile
@@ -107,9 +112,24 @@ namespace SimPe.Packages
             UserData = data;
         }
 
+        // Package that owns this entry, so a renumbered Instance can keep
+        // its CLST (compression directory) membership in step.
+        internal GeneratableFile? Owner;
+
         // Explicit impl so the public `Instance` field is still usable
         // internally while satisfying IPackedFileDescriptor.Instance.
-        uint IPackedFileDescriptor.Instance => Instance;
+        uint IPackedFileDescriptor.Instance
+        {
+            get => Instance;
+            set
+            {
+                if (value == Instance) return;
+                Owner?.Rekey(this, value);
+                Instance = value;
+            }
+        }
+
+        uint IPackedFileDescriptor.Type => Type;
     }
 
     internal sealed class PackedFile : IPackedFile
@@ -217,6 +237,7 @@ namespace SimPe.Packages
                 e.Size    = br.ReadInt32();
                 e.OriginalOffset = e.Offset;
                 e.OriginalSize   = e.Size;
+                e.Owner = this;
                 _entries.Add(e);
             }
 
@@ -260,6 +281,21 @@ namespace SimPe.Packages
                 if (e.Type == type)
                     hits.Add(e);
             return hits.ToArray();
+        }
+
+        // SimPE's Index: every resource descriptor, in index order. Returned
+        // as a snapshot, so LotAdjuster can Remove() while iterating it.
+        public IPackedFileDescriptor[] Index => _entries.ToArray();
+
+        // An untouched record is stored compressed and listed in the CLST by
+        // (Type, Group, Instance, SubType). When its Instance changes, move the
+        // CLST key too; otherwise Build() would drop it from the CLST and the
+        // game would read compressed bytes as raw data.
+        internal void Rekey(PackedFileDescriptor e, uint newInstance)
+        {
+            var oldKey = (e.Type, e.Group, e.Instance, e.SubType);
+            if (_clstSet.Remove(oldKey))
+                _clstSet.Add((e.Type, e.Group, newInstance, e.SubType));
         }
 
         public void Remove(IPackedFileDescriptor pfd)
@@ -384,6 +420,9 @@ namespace SimPe.Packages
         }
 
         public void Close() { _source = Array.Empty<byte>(); }
+        // SimPE's Close(bool total); LotAdjuster calls Close(true) before
+        // dropping a package. Nothing extra to release here.
+        public void Close(bool total) => Close();
 
         // SimPE API the ported Hood Checker calls to discard pending edits.
         // We never mutate packages we only read, so this is a no-op here.

@@ -13,6 +13,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Explicit manifest names: her code opens these by name. -->
+    <EmbeddedResource Update="LEStrings.resx" LogicalName="LotExpander.LEStrings.resources" />
+    <EmbeddedResource Update="PrimaryForm.resx" LogicalName="LotExpander.PrimaryForm.resources" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Filetypes\Filetypes.csproj" />
   </ItemGroup>
 </Project>

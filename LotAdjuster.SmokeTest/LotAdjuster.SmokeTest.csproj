@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>LotAdjuster.SmokeTest</AssemblyName>
+    <RootNamespace>LotAdjuster.SmokeTest</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LotAdjuster.Engine\LotAdjuster.Engine.csproj" />
+    <ProjectReference Include="..\Filetypes\Filetypes.csproj" />
+  </ItemGroup>
+</Project>
