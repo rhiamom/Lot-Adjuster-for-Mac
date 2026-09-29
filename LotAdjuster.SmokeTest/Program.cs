@@ -15,6 +15,8 @@
 //   adjust <HOOD> <lot#> [--front N] [--back N] [--left N] [--right N]
 //   all    <HOOD>                         her RunTests: every built lot in every
 //                                         package of the hood, +4/+6/+3/+7
+//   backroom <HOOD>                       built lots with a free strip (no lot,
+//                                         no road) one hood tile behind them
 //
 // <HOOD> is a hood code (N001) for its main package, or CODE/<package file>
 // for a subhood. Options: --out DIR (work folder), --in-place (edit the real
@@ -67,7 +69,7 @@ internal static class Program
         string hoodDir = Path.Combine(nbRoot, code);
         if (!Directory.Exists(hoodDir)) { Console.Error.WriteLine($"No hood folder {hoodDir}"); return 1; }
 
-        if (mode != "list" && !inPlace)
+        if (mode != "list" && mode != "backroom" && !inPlace)
         {
             outDir ??= Path.Combine(Path.GetTempPath(), "lotadjuster-smoke",
                 $"{code}-{DateTime.Now:yyyyMMdd-HHmmss}");
@@ -86,6 +88,7 @@ internal static class Program
             "list" => List(package),
             "adjust" => Adjust(package, args),
             "all" => All(hoodDir),
+            "backroom" => Backroom(package),
             _ => 2,
         };
     }
@@ -209,6 +212,46 @@ internal static class Program
                        OptInt(args, "--left"), OptInt(args, "--right"));
         Console.WriteLine($"  {(r.Ok ? "DONE" : "ABORTED")}: {r.Title} | {r.Explanation}");
         return r.Ok && Verify(package, inst, r.Expected) ? 0 : 1;
+    }
+
+    // Lot rectangles: Top..Top+Width-1 along x, Left..Left+Height-1 along y.
+    // Orientation = front edge: 0 row x=Top, 2 row x=Top+W-1, 3 column y=Left,
+    // 1 column y=Left+H-1. Adding back yard grows the lot on the opposite side
+    // (her FixLotInNeighborhood), so check that strip.
+    private static IEnumerable<(int x, int y)> BackStrip(R_DESC d) => d.Orientation switch
+    {
+        0 => Enumerable.Range(d.Left, d.Height).Select(y => (d.Top + d.Width, y)),
+        2 => Enumerable.Range(d.Left, d.Height).Select(y => (d.Top - 1, y)),
+        3 => Enumerable.Range(d.Top, d.Width).Select(x => (x, d.Left + d.Height)),
+        _ => Enumerable.Range(d.Top, d.Width).Select(x => (x, d.Left - 1)),
+    };
+
+    private static int Backroom(string package)
+    {
+        var hood = SimPe.Packages.File.LoadFromFile(package);
+        var nhtr = new HoodReplace.R_NHTR(hood, hood.FindFile(0xABD0DC63, 0, 0xFFFFFFFF, 0));
+        var roads = new HashSet<(int, int)>();
+        byte[] ra = nhtr.Roads;
+        for (int i = 0; i + 124 <= ra.Length; i += 124)
+            roads.Add(((int)(BitConverter.ToSingle(ra, i + 1) / 10), (int)(BitConverter.ToSingle(ra, i + 5) / 10)));
+        var descs = hood.FindFiles(DESC).Select(p => new R_DESC(hood, p)).ToList();
+        var taken = new HashSet<(int, int)>();
+        foreach (var d in descs)
+            for (int x = d.Top; x < d.Top + d.Width; x++)
+                for (int y = d.Left; y < d.Left + d.Height; y++)
+                    taken.Add((x, y));
+        Console.WriteLine($"{roads.Count} road squares, {descs.Count} lots");
+        foreach (var d in descs.OrderBy(d => d.Instance))
+        {
+            if (!IsBuilt(package, d.Instance)) continue;
+            var strip = BackStrip(d).ToList();
+            int lots = strip.Count(taken.Contains), road = strip.Count(roads.Contains);
+            bool edge = strip.Any(p => p.x < 0 || p.y < 0 || p.x > 127 || p.y > 127);
+            bool max = Math.Max(d.Width, d.Height) >= 6;
+            Console.WriteLine($"  Lot{d.Instance,-4} {(lots == 0 && road == 0 && !edge ? "FREE " : "     ")} " +
+                              $"lot squares {lots}, road squares {road}{(edge ? ", off map" : "")}{(max ? ", at max size" : "")} | {d}");
+        }
+        return 0;
     }
 
     // Her RunTests(): every built lot in every package, expanded by her
