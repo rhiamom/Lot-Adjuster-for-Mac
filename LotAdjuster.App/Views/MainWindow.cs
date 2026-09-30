@@ -81,7 +81,15 @@ public sealed class MainWindow : Window
         _form.Show();   // her Load and Shown handlers
         Refresh();
 
-        Closing += (_, _) => { if (!_form.IsClosed) _form.Close(); };   // her FormClosing
+        Closing += (_, _) => SaveHerSettings();
+    }
+
+    // Her FormClosing keeps the "Versioned backups" choice (a marker file).
+    // Closing the window raises it; quitting with Cmd-Q may not close the
+    // window first, so App also calls this on shutdown.
+    public void SaveHerSettings()
+    {
+        if (!_form.IsClosed) _form.Close();
     }
 
     #region Building the controls
@@ -480,10 +488,10 @@ public sealed class MainWindow : Window
                 Text = "Before you play or share this lot, load it in the game and build something " +
                        "(even one wall that you delete again), then save.\n\n" +
                        "Until then the lot may look empty in the neighborhood view.\n\n" +
-                       "If you widened the lot along the street without ticking Advanced \u2192 Pave Roads, " +
-                       "the new part has no road, and building won't bring it back. To fix it, either move " +
-                       "the lot in the neighborhood until it snaps to the road, or run LotAdjuster on the lot " +
-                       "again with only Pave Roads ticked.\n\n" +
+                       "Then, in the neighborhood, move the lot until it snaps to the road. Don't skip this: " +
+                       "until the lot has snapped, the game won't let you place a driveway.\n\n" +
+                       "Advanced \u2192 Pave Roads paints road and sidewalk on a part widened along the street, " +
+                       "but it doesn't replace the snap.\n\n" +
                        "Then follow the rest of the steps in the LotAdjuster window.",
                 Buttons = WF.MessageBoxButtons.OK,
                 Icon = WF.MessageBoxIcon.Warning,
