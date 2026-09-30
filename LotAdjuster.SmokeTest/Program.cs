@@ -17,6 +17,9 @@
 //                                         package of the hood, +4/+6/+3/+7
 //   backroom <HOOD>                       built lots with a free strip (no lot,
 //                                         no road) one hood tile behind them
+//   roads  <HOOD> <lot#> [--ids]          map of the lot's road/sidewalk floor tiles
+//
+// adjust --pave ticks her Advanced > Pave Roads before Finish.
 //
 // <HOOD> is a hood code (N001) for its main package, or CODE/<package file>
 // for a subhood. Options: --out DIR (work folder), --in-place (edit the real
@@ -69,7 +72,7 @@ internal static class Program
         string hoodDir = Path.Combine(nbRoot, code);
         if (!Directory.Exists(hoodDir)) { Console.Error.WriteLine($"No hood folder {hoodDir}"); return 1; }
 
-        if (mode != "list" && mode != "backroom" && !inPlace)
+        if (mode != "list" && mode != "backroom" && mode != "roads" && !inPlace)
         {
             outDir ??= Path.Combine(Path.GetTempPath(), "lotadjuster-smoke",
                 $"{code}-{DateTime.Now:yyyyMMdd-HHmmss}");
@@ -89,6 +92,7 @@ internal static class Program
             "adjust" => Adjust(package, args),
             "all" => All(hoodDir),
             "backroom" => Backroom(package),
+            "roads" => Roads(package, args),
             _ => 2,
         };
     }
@@ -152,7 +156,8 @@ internal static class Program
     private sealed record Result(bool Ok, string Title, string Explanation, int[] Expected);
 
     // One pass through her screens: Lot list -> Next -> yards -> Finish.
-    private static Result RunOne(string package, uint instance, int front, int back, int left, int right)
+    private static Result RunOne(string package, uint instance, int front, int back, int left, int right,
+                                 bool pave = false)
     {
         var form = NewForm();
         form.OpenNeighborhood(package);
@@ -172,6 +177,13 @@ internal static class Program
         {
             return new Result(false, form.Title.Text,
                 $"size out of range (max {form.WidthMax.Text}x{form.HeightMax.Text})", Array.Empty<int>());
+        }
+
+        if (pave)
+        {
+            form.AdvancedButton.PerformClick();
+            form.PaveRoads.Checked = true;
+            Console.WriteLine($"    Pave Roads: {form.PaveRoads.Checked}");
         }
 
         int[] expected = { int.Parse(form.WidthNew.Text), int.Parse(form.HeightNew.Text) };
@@ -209,7 +221,7 @@ internal static class Program
             return 2;
         }
         var r = RunOne(package, inst, OptInt(args, "--front"), OptInt(args, "--back"),
-                       OptInt(args, "--left"), OptInt(args, "--right"));
+                       OptInt(args, "--left"), OptInt(args, "--right"), args.Contains("--pave"));
         Console.WriteLine($"  {(r.Ok ? "DONE" : "ABORTED")}: {r.Title} | {r.Explanation}");
         return r.Ok && Verify(package, inst, r.Expected) ? 0 : 1;
     }
@@ -283,5 +295,55 @@ internal static class Program
         }
         Console.WriteLine($"\n{ok} adjusted OK, {failed} failed, {skipped} empty lots skipped, {Messages.Count} messages.");
         return failed == 0 ? 0 : 1;
+    }
+
+    // Floor tiles (3ARY instance 0) named through the floor string map (SMAP
+    // 0x0E): one character per tile, printed for every level that has any
+    // road or sidewalk. R road asphalt, = road lines, S sidewalk, # other
+    // floor, . nothing.
+    private static int Roads(string package, string[] args)
+    {
+        if (args.Length < 3 || !uint.TryParse(args[2].Replace("Lot", ""), out uint inst)) return 2;
+        bool ids = args.Contains("--ids");   // print SMAP reference numbers instead
+        var pkg = SimPe.Packages.File.LoadFromFile(LotPackagePath(package, inst));
+        byte[] smap = pkg.Read(pkg.FindFile(0xCAC4FC40, 0, 0xFFFFFFFF, 0x0E)).UncompressedData;
+        var names = new Dictionary<ushort, string>();
+        var br = new BinaryReader(new MemoryStream(smap));
+        br.BaseStream.Position = 83;
+        uint n = br.ReadUInt32();
+        for (int i = 0; i < n; i++) { string s = br.ReadString(); ushort r = br.ReadUInt16(); br.ReadUInt32(); names[r] = s; }
+
+        byte[] a = pkg.Read(pkg.FindFile(0x2A51171B, 0, 0xFFFFFFFF, 0)).UncompressedData;
+        br = new BinaryReader(new MemoryStream(a));
+        br.BaseStream.Position = 64 + 4 + 4 + 1 + "c3DArray".Length;
+        int w = br.ReadInt32(), h = br.ReadInt32(), d = br.ReadInt32();
+        Console.WriteLine($"floor array {w}x{h}x{d}; road/sidewalk names: " +
+            string.Join(", ", names.Where(kv => kv.Value.StartsWith("road") || kv.Value == "sidewalk")
+                                   .Select(kv => $"{kv.Key}={kv.Value}")));
+        for (int lv = 0; lv < d; lv++)
+        {
+            var grid = new char[w, h];
+            bool any = false;
+            for (int j = 0; j < w; j++)
+                for (int k = 0; k < h; k++)
+                {
+                    ushort u = br.ReadUInt16(); br.ReadBytes(6);
+                    string s = u == 0 ? "" : names.GetValueOrDefault(u, "?");
+                    char c = s == "" ? '.' : s == "sidewalk" ? 'S' : s == "road_asphalt" ? 'R'
+                           : s.StartsWith("road") ? '=' : '#';
+                    if (c is 'S' or 'R' or '=') any = true;
+                    if (ids && u != 0) c = u < 36 ? "0123456789abcdefghijklmnopqrstuvwxyz"[u] : '+';
+                    grid[j, k] = c;
+                }
+            if (!any) continue;
+            Console.WriteLine($"level {lv} (rows = width index 0..{w - 1}, columns = height index 0..{h - 1}):");
+            for (int j = 0; j < w; j++)
+            {
+                var sb = new System.Text.StringBuilder();
+                for (int k = 0; k < h; k++) sb.Append(grid[j, k]);
+                Console.WriteLine($"  {j,2} {sb}");
+            }
+        }
+        return 0;
     }
 }

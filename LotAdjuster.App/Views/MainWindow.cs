@@ -363,8 +363,8 @@ public sealed class MainWindow : Window
     // Her borderless multiline read-only boxes (Explanation, LongExpl,
     // AdvancedExpl, SizeError). On a successful final screen the step that
     // says to load the lot and build something is shown in bold dark red:
-    // until that is done the game shows the house as missing and new road
-    // as grass (found in testing, 2026-09-29). Her text is unchanged.
+    // until that is done the game shows the house as missing (found in
+    // testing, 2026-09-29). Her text is unchanged.
     private Avalonia.Controls.Control MakeReadOnlyText(WF.TextBox t, double size, bool bold)
     {
         var ui = new SelectableTextBlock
@@ -479,9 +479,11 @@ public sealed class MainWindow : Window
                 Caption = "Important: finish the lot in the game",
                 Text = "Before you play or share this lot, load it in the game and build something " +
                        "(even one wall that you delete again), then save.\n\n" +
-                       "That rebuilds the parts of the lot the game draws for itself:\n" +
-                       "  \u2022 the house in the neighborhood view (until then the lot may look empty)\n" +
-                       "  \u2022 the road and sidewalk on any widened part (until then it shows as grass)\n\n" +
+                       "Until then the lot may look empty in the neighborhood view.\n\n" +
+                       "If you widened the lot along the street without ticking Advanced \u2192 Pave Roads, " +
+                       "the new part has no road, and building won't bring it back. To fix it, either move " +
+                       "the lot in the neighborhood until it snaps to the road, or run LotAdjuster on the lot " +
+                       "again with only Pave Roads ticked.\n\n" +
                        "Then follow the rest of the steps in the LotAdjuster window.",
                 Buttons = WF.MessageBoxButtons.OK,
                 Icon = WF.MessageBoxIcon.Warning,
